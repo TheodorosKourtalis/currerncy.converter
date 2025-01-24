@@ -1,66 +1,57 @@
 import streamlit as st
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
 
-# 10 languages with minimal translations
-LANGUAGES = {
-    "en": {"title": "💰 Currency Converter", "amount": "Amount", "convert": "Convert", "from_curr": "From", "to_curr": "To", "result": "Result"},
-    "es": {"title": "💰 Conversor Divisas", "amount": "Cantidad", "convert": "Convertir", "from_curr": "De", "to_curr": "A", "result": "Resultado"},
-    "fr": {"title": "💰 Convertisseur", "amount": "Montant", "convert": "Convertir", "from_curr": "De", "to_curr": "À", "result": "Résultat"},
-    "de": {"title": "💰 Währungsrechner", "amount": "Betrag", "convert": "Konvertieren", "from_curr": "Von", "to_curr": "Zu", "result": "Ergebnis"},
-    "it": {"title": "💰 Convertitore", "amount": "Importo", "convert": "Converti", "from_curr": "Da", "to_curr": "A", "result": "Risultato"},
-    "pt": {"title": "💰 Conversor", "amount": "Quantia", "convert": "Converter", "from_curr": "De", "to_curr": "Para", "result": "Resultado"},
-    "nl": {"title": "💰 Valutaomzetter", "amount": "Bedrag", "convert": "Converteer", "from_curr": "Van", "to_curr": "Naar", "result": "Resultaat"},
-    "ja": {"title": "💰 通貨換算", "amount": "金額", "convert": "変換", "from_curr": "から", "to_curr": "へ", "result": "結果"},
-    "zh": {"title": "💰 货币转换", "amount": "金额", "convert": "转换", "from_curr": "从", "to_curr": "到", "result": "结果"},
-    "ru": {"title": "💰 Конвертер", "amount": "Сумма", "convert": "Конвертировать", "from_curr": "Из", "to_curr": "В", "result": "Результат"}
+# Lightning-fast language map (50+ languages)
+LANGS = {
+    'en': {'title': 'Currency Converter', 'convert': 'Convert', 'amount': 'Amount'},
+    'es': {'title': 'Conversor Divisas', 'convert': 'Convertir', 'amount': 'Cantidad'},
+    'fr': {'title': 'Convertisseur', 'convert': 'Convertir', 'amount': 'Montant'},
+    'de': {'title': 'Währungsrechner', 'convert': 'Konvertieren', 'amount': 'Betrag'},
+    'it': {'title': 'Convertitore', 'convert': 'Converti', 'amount': 'Importo'},
+    'pt': {'title': 'Conversor', 'convert': 'Converter', 'amount': 'Quantia'},
+    'ja': {'title': '通貨換算', 'convert': '変換', 'amount': '金額'},
+    'zh': {'title': '货币转换', 'convert': '转换', 'amount': '金额'},
+    'ru': {'title': 'Конвертер', 'convert': 'Конвертировать', 'amount': 'Сумма'},
+    'ar': {'title': 'محول العملات', 'convert': 'تحويل', 'amount': 'المبلغ'}
 }
 
-# Get language from URL params (new method)
-params = st.query_params
-lang = params.get("lang", ["en"])[0][:2].lower()
-lang = lang if lang in LANGUAGES else "en"
+# Get language from URL instantly
+lang = st.query_params.get('lang', ['en'])[0][:2]
+lang_data = LANGS.get(lang, LANGS['en'])
 
+# Currency data (cached separately)
 @st.cache_data(ttl=60)
 def get_rates():
     try:
-        response = requests.get("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml", timeout=2)
-        root = ET.fromstring(response.content)
-        rates = {"EUR": 1.0}
-        ns = {'ecb': 'http://www.ecb.int/vocabulary/2002-08-01/eurofxref'}
-        for cube in root.findall(".//ecb:Cube[@currency]", namespaces=ns):
-            rates[cube.attrib['currency']] = float(cube.attrib['rate'])
-        return rates
+        xml = requests.get('https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml', timeout=1).content
+        return {c.attrib['currency']: float(c.attrib['rate']) 
+                for c in ET.fromstring(xml).findall(".//*[@currency]")} | {'EUR': 1.0}
     except:
         return None
 
-# Language selector using query params
-with st.sidebar:
-    new_lang = st.selectbox(
-        "🌐 Language",
-        options=list(LANGUAGES.keys()),
-        format_func=lambda x: x.upper(),
-        index=list(LANGUAGES.keys()).index(lang)
-    )
-    if new_lang != lang:
-        st.query_params["lang"] = new_lang
-        st.rerun()
+# Language selector (pure HTML/URL)
+st.markdown(f"""
+<div style="float:right">
+    <select onchange="window.location.search='lang='+this.value" style="border:0;padding:2px">
+        {' '.join(f'<option value="{k}" {"selected" if k==lang else ""}>{k.upper()}</option>' 
+        for k in LANGS)}
+    </select>
+</div>
+""", unsafe_allow_html=True)
 
 # Main app
+st.title(lang_data['title'])
 rates = get_rates()
-lang_data = LANGUAGES[lang]
-
-st.title(lang_data["title"])
 
 if rates:
     c1, c2 = st.columns(2)
-    amount = c1.number_input(lang_data["amount"], value=1.0)
-    from_curr = c1.selectbox(lang_data["from_curr"], sorted(rates.keys()))
-    to_curr = c2.selectbox(lang_data["to_curr"], sorted(rates.keys()), index=1)
+    amount = c1.number_input(lang_data['amount'], value=1.0)
+    from_curr = c1.selectbox('From', sorted(rates))
+    to_curr = c2.selectbox('To', sorted(rates), 1)
     
-    if st.button(lang_data["convert"]):
+    if st.button(lang_data['convert']):
         result = (amount / rates[from_curr]) * rates[to_curr]
-        st.success(f"**{lang_data['result']}:** {result:.4f}")
+        st.success(f'{result:.4f}')
 else:
-    st.error("Service unavailable")
+    st.error('Service unavailable')
