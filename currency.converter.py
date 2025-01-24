@@ -1,8 +1,4 @@
-Please replace st.experimental_get_query_params with st.query_params.
-
-st.experimental_get_query_params will be removed after 2024-04-11.
-
-Refer to our docs page for more information.      import streamlit as st
+import streamlit as st
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
