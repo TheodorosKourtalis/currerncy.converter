@@ -14,7 +14,7 @@ LANGUAGES = {
 }
 
 # Get language from URL param instantly
-params = st.query_params()
+params = st.query_params
 lang = params.get("lang", ["en"])[0][:2].lower()
 lang = lang if lang in LANGUAGES else "en"
 
