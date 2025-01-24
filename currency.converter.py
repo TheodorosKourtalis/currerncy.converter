@@ -20,7 +20,7 @@ THEME = {
     "secondary_color": "#AED6F1"
 }
 
-# ========== ΛΗΨΗ ΔΕΔΟΜΕΝΩΝ (Με Ελέγχους) ==========
+# ========== ΛΗΨΗ ΔΕΔΟΜΕΝΩΝ ==========
 @st.cache_data(ttl=3600 * 3)
 def get_rates():
     rates = {"EUR": 1.0}
@@ -40,19 +40,25 @@ def get_rates():
     except Exception as e:
         st.error(f"Σφάλμα: {str(e)}")
     
-    # ΠΡΟΣΘΗΚΗ ΕΛΕΓΧΩΝ ΓΙΑ ΝΟΜΙΣΜΑΤΑ
+    # Πρόσθεσε τα νομίσματα που λείπουν με τιμή 1.0 προσωρινά
     for currency in CURRENCIES:
         if currency not in rates:
-            rates[currency] = 1.0  # Προσωρινή τιμή (θα πάρουμε δεδομένα από Yahoo Finance)
-    
+            rates[currency] = 1.0
     return rates
 
 # ========== ΙΣΤΟΡΙΚΑ ΔΕΔΟΜΕΝΑ ==========
 def get_history(base: str, target: str):
-    symbol = f"{base}{target}=X" if base not in ["BTC", "ETH"] else f"{target}-{base}"
+    # Διορθωμένο symbol για crypto
+    if base == "BTC":
+        symbol = f"{base}-{target}"
+    else:
+        symbol = f"{base}{target}=X"
+    
     try:
         data = yf.download(symbol, start=datetime.now() - timedelta(days=365), end=datetime.now())
-        return data["Close"].reset_index()
+        if not data.empty and 'Close' in data:
+            return data["Close"].reset_index()
+        return pd.DataFrame()  # Επιστροφή κενού αν λείπουν δεδομένα
     except:
         return pd.DataFrame()
 
@@ -74,21 +80,32 @@ def main():
         
         if st.button("**ΜΕΤΑΤΡΟΠΗ 🔄**", use_container_width=True, type="primary"):
             if from_curr not in rates or to_curr not in rates:
-                st.error("Αδυναμία μετατροπής: Το νόμισμα δεν υποστηρίζεται ακόμη 😢")
+                st.error("Αδυναμία μετατροπής: Το νόμισμα δεν υποστηρίζεται 😢")
             else:
                 converted = (amount / rates[from_curr]) * rates[to_curr]
                 st.success(f"**{amount} {CURRENCIES[from_curr]} = {converted:.2f} {CURRENCIES[to_curr]}**")
     
-    # Γράφημα
+    # Γράφημα (με έλεγχο για κενά δεδομένα)
     st.markdown("---")
     st.subheader("📈 ΙΣΤΟΡΙΚΟ 1 ΕΤΟΥΣ")
     history = get_history(from_curr, to_curr)
-    if not history.empty:
-        fig = px.line(history, x="Date", y="Close", labels={"Close": "Τιμή"}, color_discrete_sequence=[THEME["primary_color"]])
-        fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", xaxis_title=None, yaxis_title=f"{from_curr} → {to_curr}")
+    
+    if not history.empty and 'Close' in history:
+        fig = px.line(
+            history, 
+            x="Date", 
+            y="Close", 
+            labels={"Close": "Τιμή"},
+            color_discrete_sequence=[THEME["primary_color"]]
+        )
+        fig.update_layout(
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title=None,
+            yaxis_title=f"{from_curr} → {to_curr}"
+        )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.warning("Δεν βρέθηκαν δεδομένα για αυτή την ισοτιμία")
+        st.warning("Δεν υπάρχουν διαθέσιμα δεδομένα για αυτή την ισοτιμία 📉")
 
 if __name__ == "__main__":
     main()
