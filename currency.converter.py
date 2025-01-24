@@ -3,18 +3,22 @@ import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime
 
-# 54 languages with minimal translation keys
+# 10 languages with minimal translations
 LANGUAGES = {
     "en": {"title": "💰 Currency Converter", "amount": "Amount", "convert": "Convert", "from_curr": "From", "to_curr": "To", "result": "Result"},
-    "el": {"title": "💰 Μετατροπέας", "amount": "Ποσό", "convert": "Μετατροπή", "from_curr": "Από", "to_curr": "Σε", "result": "Αποτέλεσμα"},
     "es": {"title": "💰 Conversor Divisas", "amount": "Cantidad", "convert": "Convertir", "from_curr": "De", "to_curr": "A", "result": "Resultado"},
     "fr": {"title": "💰 Convertisseur", "amount": "Montant", "convert": "Convertir", "from_curr": "De", "to_curr": "À", "result": "Résultat"},
     "de": {"title": "💰 Währungsrechner", "amount": "Betrag", "convert": "Konvertieren", "from_curr": "Von", "to_curr": "Zu", "result": "Ergebnis"},
-    # Add 49+ more languages here...
+    "it": {"title": "💰 Convertitore", "amount": "Importo", "convert": "Converti", "from_curr": "Da", "to_curr": "A", "result": "Risultato"},
+    "pt": {"title": "💰 Conversor", "amount": "Quantia", "convert": "Converter", "from_curr": "De", "to_curr": "Para", "result": "Resultado"},
+    "nl": {"title": "💰 Valutaomzetter", "amount": "Bedrag", "convert": "Converteer", "from_curr": "Van", "to_curr": "Naar", "result": "Resultaat"},
+    "ja": {"title": "💰 通貨換算", "amount": "金額", "convert": "変換", "from_curr": "から", "to_curr": "へ", "result": "結果"},
+    "zh": {"title": "💰 货币转换", "amount": "金额", "convert": "转换", "from_curr": "从", "to_curr": "到", "result": "结果"},
+    "ru": {"title": "💰 Конвертер", "amount": "Сумма", "convert": "Конвертировать", "from_curr": "Из", "to_curr": "В", "result": "Результат"}
 }
 
-# Get language from URL param instantly
-params = st.experimental_get_query_params()
+# Get language from URL params (new method)
+params = st.query_params
 lang = params.get("lang", ["en"])[0][:2].lower()
 lang = lang if lang in LANGUAGES else "en"
 
@@ -31,13 +35,17 @@ def get_rates():
     except:
         return None
 
-# Language selector using URL params (no state)
-st.write("<div style='float:right'>", unsafe_allow_html=True)
-new_lang = st.selectbox("", options=list(LANGUAGES.keys()), format_func=lambda x: x.upper(), index=list(LANGUAGES.keys()).index(lang))
-if new_lang != lang:
-    st.experimental_set_query_params(lang=new_lang)
-    st.rerun()
-st.write("</div>", unsafe_allow_html=True)
+# Language selector using query params
+with st.sidebar:
+    new_lang = st.selectbox(
+        "🌐 Language",
+        options=list(LANGUAGES.keys()),
+        format_func=lambda x: x.upper(),
+        index=list(LANGUAGES.keys()).index(lang)
+    )
+    if new_lang != lang:
+        st.query_params["lang"] = new_lang
+        st.rerun()
 
 # Main app
 rates = get_rates()
