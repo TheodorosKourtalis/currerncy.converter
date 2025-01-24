@@ -1,10 +1,13 @@
-025-01-24 13:36:10.121 `label` got an empty value. This is discouraged for accessibility reasons and may be disallowed in the future by raising an exception. Please provide a non-empty label and hide it with label_visibility if needed.
-
-2025-01-24 13:36:10.217 `label` got an empty value. This is discouraged for accessibility reasons and may be disallowed in the future by raising an exception. Please provide a non-empty label and hide it with label_visibility if needed.
-
-2025-01-24 13:36:10.293 `label` got an empty value. This is discouraged for accessibility reasons and may be disallowed in the future by raising an exception. Please provide a non-empty label and hide it with label_visibility if needed.
-
-2025-01-24 13:36:10.360 `label` got an empty value. This is discouraged for accessibility reasons and may be disallowed in the future by raising an exception. Please provide a non-empty label and hide it with label_visibility if needed.
-
-2025-01-24 13:36:10.424 `label` got an empty value. This is discouraged for accessibility reasons and may be disallowed in the future by raising an exception. Please provide a non-empty label and hide it with label_visibility if needed.
-
+# Language selector with hidden label
+st.write("<div style='float:right'>", unsafe_allow_html=True)
+new_lang = st.selectbox(
+    "Language",  # Now has a label
+    options=list(LANGUAGES.keys()),
+    format_func=lambda x: x.upper(),
+    index=list(LANGUAGES.keys()).index(lang),
+    label_visibility="hidden"  # Hide the label visually
+)
+if new_lang != lang:
+    st.query_params.update({"lang": new_lang})
+    st.rerun()
+st.write("</div>", unsafe_allow_html=True)
