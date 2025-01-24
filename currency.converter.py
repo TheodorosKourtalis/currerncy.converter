@@ -1,21 +1,24 @@
 import streamlit as st
 import requests
 import xml.etree.ElementTree as ET
-from datetime import datetime
 
-# 54 languages with minimal translation keys
 LANGUAGES = {
-    "en": {"title": "💰 Currency Converter", "amount": "Amount", "convert": "Convert", "from_curr": "From", "to_curr": "To", "result": "Result"},
-    "el": {"title": "💰 Μετατροπέας", "amount": "Ποσό", "convert": "Μετατροπή", "from_curr": "Από", "to_curr": "Σε", "result": "Αποτέλεσμα"},
-    "es": {"title": "💰 Conversor Divisas", "amount": "Cantidad", "convert": "Convertir", "from_curr": "De", "to_curr": "A", "result": "Resultado"},
-    "fr": {"title": "💰 Convertisseur", "amount": "Montant", "convert": "Convertir", "from_curr": "De", "to_curr": "À", "result": "Résultat"},
-    "de": {"title": "💰 Währungsrechner", "amount": "Betrag", "convert": "Konvertieren", "from_curr": "Von", "to_curr": "Zu", "result": "Ergebnis"},
-    # Add 49+ more languages here...
+    "en": {"title": "💰 Currency Converter", "amount": "Amount", "convert": "Convert", 
+           "from_curr": "From", "to_curr": "To", "result": "Result"},
+    "el": {"title": "💰 Μετατροπέας", "amount": "Ποσό", "convert": "Μετατροπή",
+           "from_curr": "Από", "to_curr": "Σε", "result": "Αποτέλεσμα"},
+    "es": {"title": "💰 Conversor Divisas", "amount": "Cantidad", "convert": "Convertir",
+           "from_curr": "De", "to_curr": "A", "result": "Resultado"},
+    "fr": {"title": "💰 Convertisseur", "amount": "Montant", "convert": "Convertir",
+           "from_curr": "De", "to_curr": "À", "result": "Résultat"},
+    "de": {"title": "💰 Währungsrechner", "amount": "Betrag", "convert": "Konvertieren",
+           "from_curr": "Von", "to_curr": "Zu", "result": "Ergebnis"},
 }
 
-# Get language from URL param instantly
+# Get language from URL param
 params = st.query_params.to_dict()
-lang = params.get("lang", ["en"])[0][:2].lower()
+lang_param = params.get("lang", ["en"])
+lang = lang_param[0][:2].lower() if lang_param else "en"
 lang = lang if lang in LANGUAGES else "en"
 
 @st.cache_data(ttl=60)
@@ -31,13 +34,26 @@ def get_rates():
     except:
         return None
 
-# Language selector using URL params (no state)
-st.write("<div style='float:right'>", unsafe_allow_html=True)
-new_lang = st.selectbox("", options=list(LANGUAGES.keys()), format_func=lambda x: x.upper(), index=list(LANGUAGES.keys()).index(lang))
+# Language selector with HTML positioning
+st.markdown(
+    f"""<div style='float: right; margin-top: -60px;'>
+        <selectbox>
+        </selectbox>
+    </div>""",
+    unsafe_allow_html=True
+)
+
+with st.container():
+    new_lang = st.selectbox(
+        "", 
+        options=list(LANGUAGES.keys()), 
+        format_func=lambda x: x.upper(),
+        index=list(LANGUAGES.keys()).index(lang),
+        key="lang_selector"
+    )
+
 if new_lang != lang:
     st.query_params["lang"] = new_lang
-    st.rerun()
-st.write("</div>", unsafe_allow_html=True)
 
 # Main app
 rates = get_rates()
