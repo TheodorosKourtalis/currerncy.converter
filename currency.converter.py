@@ -1,111 +1,91 @@
 import streamlit as st
 import requests
-import pandas as pd
-import plotly.express as px
-import yfinance as yf
-from datetime import datetime, timedelta
+import xml.etree.ElementTree as ET
+from datetime import datetime
 
-# ========== ΡΥΘΜΙΣΕΙΣ ==========
-CURRENCIES = {
-    "EUR": "Ευρώ 🇪🇺",
-    "USD": "Δολάριο ΗΠΑ 🇺🇸",
-    "GBP": "Λίρα Αγγλίας 🇬🇧",
-    "JPY": "Γιεν Ιαπωνίας 🇯🇵",
-    "BTC": "Bitcoin ₿",
-    "CHF": "Φράγκο Ελβετίας 🇨🇭"
+# Ρυθμίσεις γλώσσας
+LANGUAGES = {
+    "en": {
+        "title": "💰 Real-Time Currency Converter",
+        "amount": "Amount",
+        "from_curr": "From Currency",
+        "to_curr": "To Currency",
+        "convert": "Convert",
+        "result": "Converted Amount",
+        "error": "Error fetching data! Please try again later.",
+        "last_update": "Last update"
+    },
+    "el": {
+        "title": "💰 Μετατροπέας Συναλλάγματος σε Πραγματικό Χρόνο",
+        "amount": "Ποσό",
+        "from_curr": "Από Νόμισμα",
+        "to_curr": "Σε Νόμισμα",
+        "convert": "Μετατροπή",
+        "result": "Μετατρεπμένο Ποσό",
+        "error": "Σφάλμα φόρτωσης δεδομένων! Δοκιμάστε ξανά αργότερα.",
+        "last_update": "Τελευταία ενημέρωση"
+    }
 }
 
-THEME = {
-    "primary_color": "#2E86C1",
-    "secondary_color": "#AED6F1"
-}
+# Αρχικοποίηση session state για γλώσσα
+if 'lang' not in st.session_state:
+    st.session_state.lang = "el"
 
-# ========== ΛΗΨΗ ΔΕΔΟΜΕΝΩΝ ==========
-@st.cache_data(ttl=3600 * 3)
-def get_rates():
-    rates = {"EUR": 1.0}
-    
+def fetch_exchange_rates():
+    """Λήψη δεδομένων από το ECB XML"""
     try:
-        # FIAT από ECB
-        ecb_data = requests.get("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml", timeout=10).text
-        for line in ecb_data.split("\n"):
-            if 'currency="' in line and 'rate="' in line:
-                currency = line.split('currency="')[1].split('"')[0]
-                rate = float(line.split('rate="')[1].split('"')[0])
-                rates[currency] = rate
+        response = requests.get("https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml")
+        root = ET.fromstring(response.content)
+        namespaces = {'gesmes': 'http://www.gesmes.org/xml/2002-08-01'}
         
-        # Crypto από CoinGecko
-        crypto = requests.get("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur", timeout=10).json()
-        rates["BTC"] = crypto.get("bitcoin", {}).get("eur", 0.0)
-    except Exception as e:
-        st.error(f"Σφάλμα: {str(e)}")
-    
-    # Πρόσθεσε τα νομίσματα που λείπουν με τιμή 1.0 προσωρινά
-    for currency in CURRENCIES:
-        if currency not in rates:
-            rates[currency] = 1.0
-    return rates
-
-# ========== ΙΣΤΟΡΙΚΑ ΔΕΔΟΜΕΝΑ ==========
-def get_history(base: str, target: str):
-    # Διορθωμένο symbol για crypto
-    if base == "BTC":
-        symbol = f"{base}-{target}"
-    else:
-        symbol = f"{base}{target}=X"
-    
-    try:
-        data = yf.download(symbol, start=datetime.now() - timedelta(days=365), end=datetime.now())
-        if not data.empty and 'Close' in data:
-            return data["Close"].reset_index()
-        return pd.DataFrame()  # Επιστροφή κενού αν λείπουν δεδομένα
+        rates = {"EUR": 1.0}
+        for cube in root.findall(".//*[@currency]"):
+            currency = cube.attrib['currency']
+            rate = cube.attrib['rate']
+            rates[currency] = float(rate)
+        
+        # Ημερομηνία ενημέρωσης
+        time = root.find(".//{http://www.ecb.int/vocabulary/2002-08-01/eurofxref}Cube[@time]")
+        update_date = time.attrib['time'] if time is not None else datetime.today().strftime('%Y-%m-%d')
+        
+        return rates, update_date
     except:
-        return pd.DataFrame()
+        return None, None
 
-# ========== UI ==========
-def main():
-    st.set_page_config(page_title="💰 Ultra Converter", page_icon="💶", layout="centered")
-    st.markdown(f"<h1 style='text-align:center; color:{THEME['primary_color']};'>💰 ULTRA CURRENCY CONVERTER</h1>", unsafe_allow_html=True)
-    
-    # Μετατροπέας
-    with st.container():
-        rates = get_rates()
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            amount = st.number_input("**ΠΟΣΟ**", min_value=0.0, value=100.0, step=0.1)
-            from_curr = st.selectbox("**ΑΠΟ**", options=list(CURRENCIES.keys()), format_func=lambda x: CURRENCIES[x])
-        with col2:
-            to_curr = st.selectbox("**ΣΕ**", options=list(CURRENCIES.keys()), format_func=lambda x: CURRENCIES[x])
-        
-        if st.button("**ΜΕΤΑΤΡΟΠΗ 🔄**", use_container_width=True, type="primary"):
-            if from_curr not in rates or to_curr not in rates:
-                st.error("Αδυναμία μετατροπής: Το νόμισμα δεν υποστηρίζεται 😢")
-            else:
-                converted = (amount / rates[from_curr]) * rates[to_curr]
-                st.success(f"**{amount} {CURRENCIES[from_curr]} = {converted:.2f} {CURRENCIES[to_curr]}**")
-    
-    # Γράφημα (με έλεγχο για κενά δεδομένα)
-    st.markdown("---")
-    st.subheader("📈 ΙΣΤΟΡΙΚΟ 1 ΕΤΟΥΣ")
-    history = get_history(from_curr, to_curr)
-    
-    if not history.empty and 'Close' in history:
-        fig = px.line(
-            history, 
-            x="Date", 
-            y="Close", 
-            labels={"Close": "Τιμή"},
-            color_discrete_sequence=[THEME["primary_color"]]
-        )
-        fig.update_layout(
-            plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title=None,
-            yaxis_title=f"{from_curr} → {to_curr}"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("Δεν υπάρχουν διαθέσιμα δεδομένα για αυτή την ισοτιμία 📉")
+def switch_language():
+    """Αλλαγή γλώσσας"""
+    st.session_state.lang = "el" if st.session_state.lang == "en" else "en"
 
-if __name__ == "__main__":
-    main()
+# Λήψη δεδομένων
+exchange_rates, update_date = fetch_exchange_rates()
+currencies = list(exchange_rates.keys()) if exchange_rates else ["EUR"]
+
+# Δημιουργία διεπαφής
+lang = LANGUAGES[st.session_state.lang]
+
+st.title(lang["title"])
+
+# Κουμπί αλλαγής γλώσσας
+st.button("Ελληνικά / English", on_click=switch_language)
+
+if exchange_rates:
+    # Πεδίο εισαγωγής ποσού
+    amount = st.number_input(lang["amount"], min_value=0.0, value=1.0)
+
+    # Επιλογή νομισμάτων
+    col1, col2 = st.columns(2)
+    with col1:
+        from_curr = st.selectbox(lang["from_curr"], currencies, index=0)
+    with col2:
+        to_curr = st.selectbox(lang["to_curr"], currencies, index=1)
+
+    # Μετατροπή
+    if st.button(lang["convert"]):
+        try:
+            converted_amount = (amount / exchange_rates[from_curr]) * exchange_rates[to_curr]
+            st.success(f"**{lang['result']}:** {converted_amount:.2f} {to_curr}")
+            st.caption(f"{lang['last_update']}: {update_date}")
+        except:
+            st.error(lang["error"])
+else:
+    st.error(lang["error"])
