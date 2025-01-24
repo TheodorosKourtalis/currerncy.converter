@@ -15,7 +15,7 @@ LANGUAGES = {
            "from_curr": "Von", "to_curr": "Zu", "result": "Ergebnis"},
 }
 
-# Get language from URL param
+# Get language from URL params
 params = st.query_params.to_dict()
 lang_param = params.get("lang", ["en"])
 lang = lang_param[0][:2].lower() if lang_param else "en"
@@ -34,28 +34,33 @@ def get_rates():
     except:
         return None
 
-# Language selector with HTML positioning
-st.markdown(
-    f"""<div style='float: right; margin-top: -60px;'>
-        <selectbox>
-        </selectbox>
-    </div>""",
-    unsafe_allow_html=True
+# HTML for language selector floating right
+st.write("""
+<div style='float: right; margin-top: -60px;'>
+    <div class="stSelectbox">
+""", unsafe_allow_html=True)
+
+# Language selector (Streamlit component inside HTML)
+new_lang = st.selectbox(
+    label="Language",
+    options=list(LANGUAGES.keys()),
+    format_func=lambda x: x.upper(),
+    index=list(LANGUAGES.keys()).index(lang),
+    key="lang_selector"
 )
 
-with st.container():
-    new_lang = st.selectbox(
-        "", 
-        options=list(LANGUAGES.keys()), 
-        format_func=lambda x: x.upper(),
-        index=list(LANGUAGES.keys()).index(lang),
-        key="lang_selector"
-    )
+# Close HTML divs
+st.write("""
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
+# Update query params if language changed
 if new_lang != lang:
     st.query_params["lang"] = new_lang
+    st.rerun()
 
-# Main app
+# Main app content
 rates = get_rates()
 lang_data = LANGUAGES[lang]
 
