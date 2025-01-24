@@ -13,9 +13,9 @@ LANGUAGES = {
     # Add 49+ more languages here...
 }
 
-# Get language from URL param instantly
-params = st.experimental_get_query_params()
-lang = params.get("lang", ["en"])[0][:2].lower()
+# Get language from URL param
+lang_param = st.query_params.get("lang", ["en"])
+lang = lang_param[0][:2].lower() if lang_param else "en"
 lang = lang if lang in LANGUAGES else "en"
 
 @st.cache_data(ttl=60)
@@ -31,12 +31,11 @@ def get_rates():
     except:
         return None
 
-# Language selector using URL params (no state)
+# Language selector using URL params
 st.write("<div style='float:right'>", unsafe_allow_html=True)
 new_lang = st.selectbox("", options=list(LANGUAGES.keys()), format_func=lambda x: x.upper(), index=list(LANGUAGES.keys()).index(lang))
 if new_lang != lang:
-    st.experimental_set_query_params(lang=new_lang)
-    st.rerun()
+    st.query_params["lang"] = new_lang
 st.write("</div>", unsafe_allow_html=True)
 
 # Main app
